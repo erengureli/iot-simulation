@@ -92,6 +92,69 @@ def get_sensor_stats(sensor_id):
         }
 
 
+def get_sensor_analysis(sensor_id):
+    """Calculates min, max, average, and variance for a sensor's readings."""
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+
+        # Check if sensor has data
+        cursor.execute(
+            "SELECT COUNT(*) FROM readings WHERE sensor_id = ?", (sensor_id,)
+        )
+        count = cursor.fetchone()[0]
+        if count == 0:
+            return None
+
+        # Get min, max, avg for all three metrics
+        cursor.execute(
+            """
+            SELECT
+                MIN(temperature), MAX(temperature), AVG(temperature),
+                MIN(humidity), MAX(humidity), AVG(humidity),
+                MIN(light), MAX(light), AVG(light)
+            FROM readings WHERE sensor_id = ?
+            """,
+            (sensor_id,),
+        )
+        row = cursor.fetchone()
+
+        # Calculate variance manually:
+        # VAR = AVG(x^2) - (AVG(x))^2
+        cursor.execute(
+            """
+            SELECT
+                AVG(temperature * temperature) - AVG(temperature) * AVG(temperature),
+                AVG(humidity * humidity) - AVG(humidity) * AVG(humidity),
+                AVG(light * light) - AVG(light) * AVG(light)
+            FROM readings WHERE sensor_id = ?
+            """,
+            (sensor_id,),
+        )
+        var_row = cursor.fetchone()
+
+        return {
+            "count": count,
+            "temperature": {
+                "min": round(row[0], 2),
+                "max": round(row[1], 2),
+                "avg": round(row[2], 2),
+                "variance": round(var_row[0], 4),
+            },
+            "humidity": {
+                "min": round(row[3], 2),
+                "max": round(row[4], 2),
+                "avg": round(row[5], 2),
+                "variance": round(var_row[1], 4),
+            },
+            "light": {
+                "min": round(row[6], 2),
+                "max": round(row[7], 2),
+                "avg": round(row[8], 2),
+                "variance": round(var_row[2], 4),
+            },
+        }
+
+
 def insert_reading(sensor_id, timestamp, temperature, humidity, light):
     """Inserts a sensor reading into the database."""
     with sqlite3.connect(DB_PATH) as conn:

@@ -1,7 +1,7 @@
 import os
 import threading
 
-from database import get_all_sensors, get_sensor_stats, init_db
+from database import get_all_sensors, get_sensor_analysis, get_sensor_stats, init_db
 from flask import Flask, jsonify, render_template_string, request
 from mqtt_handler import run_mqtt
 
@@ -19,10 +19,17 @@ HTML_TEMPLATE = """
     <style>
         body { font-family: sans-serif; background-color: #f4f4f9; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 2rem; }
         .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; margin-bottom: 2rem; }
-        .chart-container { display: flex; flex-direction: column; align-items: center; gap: 2rem; width: 100%; max-width: 800px; }
-        .chart-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; height: 350px; display: flex; flex-direction: column; }
+        .chart-container { display: flex; flex-direction: column; align-items: center; gap: 2rem; width: 100%; max-width: 900px; }
+        .chart-row { display: flex; gap: 1.5rem; width: 100%; align-items: stretch; }
+        .chart-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex: 2; height: 350px; display: flex; flex-direction: column; }
         .chart-card h3 { margin-top: 0; font-size: 1rem; color: #555; }
         .chart-card canvas { flex: 1; min-height: 0; }
+        .stats-panel { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex: 1; min-width: 220px; display: flex; flex-direction: column; justify-content: center; }
+        .stats-panel h4 { margin: 0 0 0.8rem 0; font-size: 0.95rem; color: #555; border-bottom: 2px solid #eee; padding-bottom: 0.4rem; }
+        .stats-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .stats-table th { text-align: left; color: #888; font-weight: 600; padding: 0.3rem 0.4rem; border-bottom: 1px solid #eee; }
+        .stats-table td { padding: 0.35rem 0.4rem; font-family: monospace; color: #333; }
+        .stats-table tr:nth-child(even) td { background: #f9f9fc; }
         h1 { color: #333; font-size: 1.5rem; margin-bottom: 2rem; }
         h2 { color: #555; font-size: 1.2rem; border-bottom: 2px solid #eee; padding-bottom: 0.5rem; margin-top: 0; }
         .stat { margin: 1rem 0; display: flex; justify-content: space-between; }
@@ -30,6 +37,10 @@ HTML_TEMPLATE = """
         .value { color: #007bff; font-family: monospace; font-size: 1.2rem; }
         .footer { font-size: 0.8rem; color: #999; margin-top: 1.5rem; border-top: 1px solid #eee; padding-top: 0.5rem; }
         select { padding: 0.5rem 1rem; border-radius: 4px; border: 1px solid #ccc; font-size: 1rem; margin-bottom: 2rem; width: 100%; max-width: 400px; }
+        @media (max-width: 700px) {
+            .chart-row { flex-direction: column; }
+            .stats-panel { min-width: unset; }
+        }
     </style>
 </head>
 <body>
@@ -66,17 +77,53 @@ HTML_TEMPLATE = """
     </div>
 
     <div class="chart-container" id="chart-container" {% if not stats %}style="display: none;"{% endif %}>
-        <div class="chart-card">
-            <h3>Temperature (°C)</h3>
-            <canvas id="temp-chart"></canvas>
+        <div class="chart-row">
+            <div class="chart-card">
+                <h3>Temperature (°C)</h3>
+                <canvas id="temp-chart"></canvas>
+            </div>
+            <div class="stats-panel" id="temp-stats">
+                <h4>Temperature Stats</h4>
+                <table class="stats-table">
+                    <tr><th>Metric</th><th>Value</th></tr>
+                    <tr><td>Min</td><td id="temp-min">-</td></tr>
+                    <tr><td>Max</td><td id="temp-max">-</td></tr>
+                    <tr><td>Avg</td><td id="temp-avg">-</td></tr>
+                    <tr><td>Variance</td><td id="temp-var">-</td></tr>
+                </table>
+            </div>
         </div>
-        <div class="chart-card">
-            <h3>Humidity (%)</h3>
-            <canvas id="hum-chart"></canvas>
+        <div class="chart-row">
+            <div class="chart-card">
+                <h3>Humidity (%)</h3>
+                <canvas id="hum-chart"></canvas>
+            </div>
+            <div class="stats-panel" id="hum-stats">
+                <h4>Humidity Stats</h4>
+                <table class="stats-table">
+                    <tr><th>Metric</th><th>Value</th></tr>
+                    <tr><td>Min</td><td id="hum-min">-</td></tr>
+                    <tr><td>Max</td><td id="hum-max">-</td></tr>
+                    <tr><td>Avg</td><td id="hum-avg">-</td></tr>
+                    <tr><td>Variance</td><td id="hum-var">-</td></tr>
+                </table>
+            </div>
         </div>
-        <div class="chart-card">
-            <h3>Light (lux)</h3>
-            <canvas id="light-chart"></canvas>
+        <div class="chart-row">
+            <div class="chart-card">
+                <h3>Light (lux)</h3>
+                <canvas id="light-chart"></canvas>
+            </div>
+            <div class="stats-panel" id="light-stats">
+                <h4>Light Stats</h4>
+                <table class="stats-table">
+                    <tr><th>Metric</th><th>Value</th></tr>
+                    <tr><td>Min</td><td id="light-min">-</td></tr>
+                    <tr><td>Max</td><td id="light-max">-</td></tr>
+                    <tr><td>Avg</td><td id="light-avg">-</td></tr>
+                    <tr><td>Variance</td><td id="light-var">-</td></tr>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -133,6 +180,26 @@ HTML_TEMPLATE = """
             });
         }
 
+        async function updateAnalysis() {
+            if (!SELECTED_SENSOR) return;
+            try {
+                const response = await fetch(`/api/analysis/${SELECTED_SENSOR}`);
+                if (!response.ok) return;
+                const analysis = await response.json();
+                if (analysis && !analysis.error) {
+                    ['temperature', 'humidity', 'light'].forEach(metric => {
+                        const prefix = metric === 'temperature' ? 'temp' : (metric === 'humidity' ? 'hum' : 'light');
+                        document.getElementById(`${prefix}-min`).textContent = analysis[metric].min;
+                        document.getElementById(`${prefix}-max`).textContent = analysis[metric].max;
+                        document.getElementById(`${prefix}-avg`).textContent = analysis[metric].avg;
+                        document.getElementById(`${prefix}-var`).textContent = analysis[metric].variance;
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching analysis:', error);
+            }
+        }
+
         async function updateStats() {
             if (!SELECTED_SENSOR) return;
 
@@ -174,6 +241,9 @@ HTML_TEMPLATE = """
                         charts['light-chart'].data.datasets[0].data = stats.history.map(h => h.light);
                         charts['light-chart'].update();
                     }
+
+                    // Also update analysis stats
+                    updateAnalysis();
                 }
             } catch (error) {
                 console.error('Error fetching stats:', error);
@@ -227,6 +297,14 @@ def get_stats(sensor_id):
     stats = get_sensor_stats(sensor_id)
     if stats:
         return jsonify(stats)
+    return jsonify({"error": "Sensor not found"}), 404
+
+
+@app.route("/api/analysis/<sensor_id>")
+def get_analysis(sensor_id):
+    analysis = get_sensor_analysis(sensor_id)
+    if analysis:
+        return jsonify(analysis)
     return jsonify({"error": "Sensor not found"}), 404
 
 
