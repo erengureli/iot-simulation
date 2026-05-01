@@ -1,0 +1,43 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mqtt_broker
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+
+  publisher:
+    build:
+      context: ./publisher
+      dockerfile: Dockerfile
+    container_name: mqtt_publisher
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      - BROKER_HOST=mosquitto
+      # - BROKER_PORT=1883
+      # - PUBLISH_INTERVAL=2
+      # - NUM_SENSORS=100
+
+  subscriber:
+    build:
+      context: ./subscriber
+      dockerfile: Dockerfile
+    container_name: mqtt_subscriber
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    ports:
+      - "8000:8000"
+    environment:
+      - BROKER_HOST=mosquitto
+      - DB_PATH=/data/sensors.db
+      # - BROKER_PORT=1883
+      # - WEB_PORT=8000
+      # - REFRESH_INTERVAL=1
+    volumes:
+      - subscriber_data:/data
+
+volumes:
+  subscriber_data:
