@@ -52,8 +52,8 @@ Simulates up to 100 independent sensors publishing temperature, humidity, and li
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-username/mqtt-sensor-monitor.git
-cd mqtt-sensor-monitor
+git clone https://github.com/erengureli/iot-simulation.git
+cd iot-simulation
 
 # Build and start all services
 docker compose up -d --build
