@@ -43,7 +43,7 @@ def create_mqtt_client():
 def publish_payload(client, payload):
     """Publishes a sensor payload to the MQTT broker."""
     json_payload = json.dumps(payload)
-    result = client.publish(TOPIC, json_payload, qos=1)
+    result = client.publish(TOPIC, json_payload)
 
     if result.rc == mqtt.MQTT_ERR_SUCCESS:
         print(
