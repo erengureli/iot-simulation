@@ -1,6 +1,6 @@
 # 📡 MQTT IoT Sensor Monitoring System
 
-A real-time IoT sensor data pipeline built with **Python**, **MQTT**, **SQLite**, and **Flask** — fully containerized with Docker Compose.
+A  real-time IoT sensor data pipeline built with **Python**, **MQTT**, **SQLite**, and **Flask** — fully containerized with Docker Compose.
 
 Simulates up to 100 independent sensors publishing temperature, humidity, and light data to an MQTT broker, which is then stored in a database and visualized on a live web dashboard.
 
